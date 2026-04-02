@@ -34,7 +34,6 @@ function App() {
   const [editingText, setEditingText] = useState('')
 
   const [clearedTodos, setClearedTodos] = useState([])
-  const [isMinimized, setIsMinimized] = useState(false)
 
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
 
@@ -183,7 +182,6 @@ function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return
-      if (isMinimized) return
       if (settingsOpen) return
       if (isTypingInField(e.target)) return
       e.preventDefault()
@@ -196,7 +194,7 @@ function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen, isMinimized])
+  }, [settingsOpen])
 
   const leftCount = todos.filter((todo) => !todo.completed).length
 
@@ -213,53 +211,7 @@ function App() {
   const completedCount = todos.filter((todo) => todo.completed).length
 
   return (
-    <div className={`app${isMinimized ? ' app--minimized' : ''}`}>
-      <button
-        type="button"
-        className="app-window-btn"
-        onClick={() => {
-          setIsMinimized((v) => {
-            const next = !v
-            if (next) {
-              setIsAddOpen(false)
-              setInputValue('')
-            }
-            return next
-          })
-        }}
-        aria-label={isMinimized ? 'Expand todo list' : 'Minimize todo list'}
-        aria-pressed={isMinimized}
-      >
-        {isMinimized ? (
-          <svg
-            className="app-window-btn-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-          </svg>
-        ) : (
-          <svg
-            className="app-window-btn-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M8 15h8" />
-          </svg>
-        )}
-      </button>
-
+    <div className="app">
       <button
         type="button"
         className="app-settings-btn"
@@ -269,44 +221,37 @@ function App() {
         <img src={settingsPic} alt="" width={20} height={20} />
       </button>
 
-      <TodoTitle
-        showShortcutHint={settings.showShortcutHint}
-        minimal={isMinimized}
+      <TodoTitle showShortcutHint={settings.showShortcutHint} />
+
+      <TodoInput
+        isOpen={isAddOpen}
+        onOpen={() => setIsAddOpen(true)}
+        onClose={() => {
+          setIsAddOpen(false)
+          setInputValue('')
+        }}
+        inputRef={addInputRef}
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        isComposing={isComposing}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={(e) => {
+          setIsComposing(false)
+          setInputValue(e.target.value)
+        }}
+        onAdd={handleAddTodo}
       />
 
-      {!isMinimized ? (
-        <>
-          <TodoInput
-            isOpen={isAddOpen}
-            onOpen={() => setIsAddOpen(true)}
-            onClose={() => {
-              setIsAddOpen(false)
-              setInputValue('')
-            }}
-            inputRef={addInputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            isComposing={isComposing}
-            onCompositionStart={() => setIsComposing(true)}
-            onCompositionEnd={(e) => {
-              setIsComposing(false)
-              setInputValue(e.target.value)
-            }}
-            onAdd={handleAddTodo}
-          />
+      <TodoLeftCount leftCount={leftCount} />
 
-          <TodoLeftCount leftCount={leftCount} />
+      <TodoFilters filterType={filterType} onFilterChange={setFilterType} />
 
-          <TodoFilters filterType={filterType} onFilterChange={setFilterType} />
-
-          <TodoClearActions
-            completedCount={completedCount}
-            clearedCount={clearedTodos.length}
-            onClearCompleted={clearCompleted}
-            onUndoClear={handleUndoClearCompleted}
-          />
-        </>
-      ) : null}
+      <TodoClearActions
+        completedCount={completedCount}
+        clearedCount={clearedTodos.length}
+        onClearCompleted={clearCompleted}
+        onUndoClear={handleUndoClearCompleted}
+      />
 
       <TodoList
         todos={filteredTodos}

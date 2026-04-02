@@ -15,75 +15,6 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: var(--shadow);
-  user-select: none;
-}
-
-/* Allow selecting text only inside inputs */
-.app input,
-.app textarea {
-  user-select: text;
-}
-
-.settings-modal,
-.settings-modal * {
-  user-select: none;
-}
-
-.settings-modal input,
-.settings-modal textarea {
-  user-select: text;
-}
-
-.todo-add-modal,
-.todo-add-modal * {
-  user-select: none;
-}
-
-.todo-add-modal input,
-.todo-add-modal textarea {
-  user-select: text;
-}
-
-.app-window-btn {
-  position: absolute;
-  top: 0.65rem;
-  left: 0.65rem;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
-  padding: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text-h);
-  cursor: pointer;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 40%, transparent);
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    transform 0.1s ease;
-}
-
-.app-window-btn:hover {
-  border-color: var(--accent-border);
-  background: var(--social-bg);
-}
-
-.app-window-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.app-window-btn:active {
-  transform: scale(0.96);
-}
-
-.app-window-btn-icon {
-  width: 1.15rem;
-  height: 1.15rem;
 }
 
 .app-settings-btn {
@@ -140,10 +71,6 @@
   line-height: 1.2;
   text-align: center;
   color: var(--text-h);
-}
-
-.app--minimized h1 {
-  margin-bottom: 0.85rem;
 }
 
 .app .todo-subtitle {
@@ -540,8 +467,8 @@
   position: absolute;
   right: 0;
   top: calc(100% + 0.35rem);
-  min-width: 10rem;
-  padding: 0.4rem;
+  min-width: 13rem;
+  padding: 0.35rem;
   border-radius: 12px;
   background: color-mix(in srgb, var(--bg) 92%, var(--code-bg));
   border: 1px solid var(--border);
@@ -581,7 +508,7 @@
   height: 1px;
   width: 100%;
   background: var(--border);
-  margin: 0.4rem 0;
+  margin: 0.35rem 0;
 }
 
 .todo-more-color-block {
@@ -598,8 +525,8 @@
 
 .todo-more-color-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
 }
 
 .todo-more-color-btn {
@@ -607,11 +534,12 @@
   border-radius: 12px;
   background: transparent;
   cursor: pointer;
-  padding: 0.4rem 0.5rem;
+  padding: 0.45rem;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.5rem;
+  justify-content: center;
+  min-height: 2.25rem;
+  aspect-ratio: 1;
   transition:
     border-color 0.15s ease,
     background 0.15s ease;
@@ -628,20 +556,11 @@
 }
 
 .todo-more-color-dot {
-  display: inline-block;
-  flex-shrink: 0;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: var(--todo-color, var(--accent));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
-}
-
-.todo-more-color-name {
-  font-size: 0.76rem;
-  font-weight: 650;
-  color: var(--text-h);
-  line-height: 1.1;
 }
 
 .completed {

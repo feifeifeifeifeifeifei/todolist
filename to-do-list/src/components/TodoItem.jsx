@@ -154,13 +154,13 @@ export default function TodoItem({
                           }}
                           aria-pressed={isActive}
                           aria-label={`Set todo color to ${c.name}`}
+                          title={c.name}
                           style={{ '--todo-color': c.hex }}
                         >
                           <span
                             className="todo-more-color-dot"
                             style={{ background: c.hex }}
                           />
-                          <span className="todo-more-color-name">{c.name}</span>
                         </button>
                       )
                     })}
