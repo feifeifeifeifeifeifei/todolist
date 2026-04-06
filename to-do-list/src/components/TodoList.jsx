@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import TodoItem from './TodoItem'
 
 export default function TodoList({
@@ -11,10 +12,50 @@ export default function TodoList({
   onToggle,
   onDelete,
   todoColors,
-  onSetTodoColor,
+  onSetColor,
+  onReorder,
 }) {
+  const [draggedId, setDraggedId] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+
+  const handleDragStart = (id) => setDraggedId(id)
+
+  const handleDragOver = (id, position) => {
+    if (id === draggedId) {
+      setDropTarget(null)
+      return
+    }
+    setDropTarget((prev) => {
+      if (prev && prev.id === id && prev.position === position) return prev
+      return { id, position }
+    })
+  }
+
+  const handleDrop = () => {
+    if (draggedId != null && dropTarget != null) {
+      onReorder(draggedId, dropTarget.id, dropTarget.position)
+    }
+  }
+
+  const handleDragEnd = () => {
+    setDraggedId(null)
+    setDropTarget(null)
+  }
+
   return (
-    <ul className="todo-list">
+    <ul
+      className="todo-list"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        handleDrop()
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setDropTarget(null)
+        }
+      }}
+    >
       {todos.map((todo) => (
         <TodoItem
           key={todo.id}
@@ -28,7 +69,14 @@ export default function TodoList({
           onToggle={onToggle}
           onDelete={onDelete}
           todoColors={todoColors}
-          onSetTodoColor={onSetTodoColor}
+          onSetColor={onSetColor}
+          isDragging={draggedId === todo.id}
+          dropIndicator={
+            dropTarget?.id === todo.id ? dropTarget.position : null
+          }
+          onItemDragStart={handleDragStart}
+          onItemDragOver={handleDragOver}
+          onItemDragEnd={handleDragEnd}
         />
       ))}
     </ul>

@@ -57,10 +57,13 @@ function App() {
       id: Date.now(),
       text: inputValue,
       completed: false,
-      colorId: settings.todoColors?.[0]?.id ?? 'c0',
     }
 
-    setTodos((prevTodos) => [...prevTodos, newTodo])
+    setTodos((prevTodos) =>
+      settings.insertPosition === 'top'
+        ? [newTodo, ...prevTodos]
+        : [...prevTodos, newTodo],
+    )
     setInputValue('')
     if (settings.autoCloseAfterAdd) {
       setIsAddOpen(false)
@@ -96,15 +99,28 @@ function App() {
 
   const handleUndoClearCompleted = () => {
     if (clearedTodos.length === 0) return
-
-    setTodos((previousTodos) => [...previousTodos, ...clearedTodos])
+    setTodos((prev) =>
+      settings.insertPosition === 'top'
+        ? [...prev, ...clearedTodos]
+        : [...clearedTodos, ...prev],
+    )
     setClearedTodos([])
   }
 
-  const handleSetTodoColor = (todoId, colorId) => {
-    setTodos((prevTodos) =>
-      prevTodos.map((t) => (t.id === todoId ? { ...t, colorId } : t)),
-    )
+  const handleReorder = (draggedId, targetId, position) => {
+    if (draggedId === targetId) return
+    setTodos((prev) => {
+      const draggedIdx = prev.findIndex((t) => t.id === draggedId)
+      if (draggedIdx === -1) return prev
+      const dragged = prev[draggedIdx]
+      const without = [...prev]
+      without.splice(draggedIdx, 1)
+      const targetIdx = without.findIndex((t) => t.id === targetId)
+      if (targetIdx === -1) return prev
+      const insertAt = position === 'before' ? targetIdx : targetIdx + 1
+      without.splice(insertAt, 0, dragged)
+      return without
+    })
   }
 
   const handleStartEdit = (todo) => {
@@ -136,6 +152,14 @@ function App() {
     setEditingText('')
   }
 
+  const handleSetColor = (id, color) => {
+    setTodos((prev) =>
+      prev.map((todo) =>
+        todo.id === id ? { ...todo, color: color || undefined } : todo,
+      ),
+    )
+  }
+
   const handleClearAllTodos = () => {
     const n = todos.length
     if (n === 0) return
@@ -150,16 +174,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(todos))
   }, [todos])
-
-  useEffect(() => {
-    // If a color is removed/changed in Settings, make sure existing todos still reference valid colors.
-    const validIds = new Set((settings.todoColors ?? []).map((c) => c.id))
-    const fallbackId = settings.todoColors?.[0]?.id ?? 'c0'
-    setTodos((prev) =>
-      prev.map((t) => (validIds.has(t.colorId) ? t : { ...t, colorId: fallbackId })),
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.todoColors])
 
   useEffect(() => {
     if (!isAddOpen) return
@@ -204,9 +218,6 @@ function App() {
   } else if (filterType === 'completed') {
     filteredTodos = todos.filter((todo) => todo.completed)
   }
-  filteredTodos = [...filteredTodos].sort((a, b) =>
-    settings.insertPosition === 'top' ? b.id - a.id : a.id - b.id,
-  )
 
   const completedCount = todos.filter((todo) => todo.completed).length
 
@@ -264,7 +275,8 @@ function App() {
         onToggle={handleToggle}
         onDelete={handleDelete}
         todoColors={settings.todoColors}
-        onSetTodoColor={handleSetTodoColor}
+        onSetColor={handleSetColor}
+        onReorder={handleReorder}
       />
 
       <SettingsPanel

@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ACCENT_PRESETS } from '../settings/storage'
+import { ACCENT_PRESETS, MIN_TODO_COLORS, MAX_TODO_COLORS } from '../settings/storage'
 
 const SWATCH_HEX = {
   black: '#0f172a',
@@ -9,6 +9,97 @@ const SWATCH_HEX = {
   blue: '#2563eb',
   teal: '#0d9488',
   orange: '#ea580c',
+}
+
+function TodoColorEditor({ colors, onChange }) {
+  const pickerRef = useRef(null)
+  const editIndexRef = useRef(-1)
+
+  const canRemove = colors.length > MIN_TODO_COLORS
+  const canAdd = colors.length < MAX_TODO_COLORS
+
+  const handleColorChange = (index, hex) => {
+    const next = [...colors]
+    next[index] = hex
+    onChange(next)
+  }
+
+  const handleRemove = (index) => {
+    if (!canRemove) return
+    const next = colors.filter((_, i) => i !== index)
+    onChange(next)
+  }
+
+  const handleAdd = () => {
+    if (!canAdd) return
+    onChange([...colors, '#9333ea'])
+  }
+
+  const openPicker = (index) => {
+    editIndexRef.current = index
+    if (pickerRef.current) {
+      pickerRef.current.value = colors[index]
+      pickerRef.current.click()
+    }
+  }
+
+  const onPickerInput = (e) => {
+    const idx = editIndexRef.current
+    if (idx < 0 || idx >= colors.length) return
+    handleColorChange(idx, e.target.value)
+  }
+
+  return (
+    <div className="todo-color-editor">
+      <input
+        ref={pickerRef}
+        type="color"
+        className="todo-color-editor-hidden-picker"
+        aria-hidden
+        tabIndex={-1}
+        onInput={onPickerInput}
+      />
+      <div className="todo-color-editor-grid">
+        {colors.map((hex, i) => (
+          <div key={i} className="todo-color-editor-item">
+            <button
+              type="button"
+              className="todo-color-editor-swatch"
+              style={{ '--dot': hex }}
+              title={`Edit ${hex}`}
+              aria-label={`Edit color ${i + 1}`}
+              onClick={() => openPicker(i)}
+            />
+            {canRemove && (
+              <button
+                type="button"
+                className="todo-color-editor-remove"
+                title="Remove"
+                aria-label={`Remove color ${i + 1}`}
+                onClick={() => handleRemove(i)}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {canAdd && (
+          <button
+            type="button"
+            className="todo-color-editor-add"
+            title="Add color"
+            aria-label="Add color"
+            onClick={handleAdd}
+          >
+            +
+          </button>
+        )}
+      </div>
+      <p className="settings-help">
+        Click a circle to change its color. {MIN_TODO_COLORS}–{MAX_TODO_COLORS} colors allowed.
+      </p>
+    </div>
+  )
 }
 
 function SettingsToggle({ id, checked, onChange, label }) {
@@ -36,24 +127,6 @@ export default function SettingsPanel({
   todoCount,
   onClearAllTodos,
 }) {
-  const MIN_TODO_COLORS = 4
-  const MAX_TODO_COLORS = 8
-
-  const todoColorPool = [
-    '#0ea5e9',
-    '#22c55e',
-    '#f59e0b',
-    '#f97316',
-    '#ef4444',
-    '#14b8a6',
-    '#a855f7',
-    '#f472b6',
-    '#eab308',
-    '#3b82f6',
-    '#06b6d4',
-    '#64748b',
-  ]
-
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
@@ -71,46 +144,6 @@ export default function SettingsPanel({
   if (!open) return null
 
   const patch = (partial) => onPatch(partial)
-
-  const addTodoColor = () => {
-    if (settings.todoColors.length >= MAX_TODO_COLORS) return
-
-    const used = new Set(settings.todoColors.map((c) => c.hex.toLowerCase()))
-    const nextHex =
-      todoColorPool.find((h) => !used.has(h.toLowerCase())) ??
-      '#334155'
-
-    const nextId = `c_${Date.now()}_${Math.random().toString(16).slice(2)}`
-    const nextIndex = settings.todoColors.length + 1
-
-    patch({
-      todoColors: [
-        ...settings.todoColors,
-        {
-          id: nextId,
-          name: `Color ${nextIndex}`,
-          hex: nextHex,
-        },
-      ],
-    })
-  }
-
-  const updateTodoColorAt = (idx, partial) => {
-    patch({
-      todoColors: settings.todoColors.map((c, i) =>
-        i === idx ? { ...c, ...partial } : c,
-      ),
-    })
-  }
-
-  const removeTodoColorAt = (idx) => {
-    if (idx < MIN_TODO_COLORS) return
-    if (settings.todoColors.length <= MIN_TODO_COLORS) return
-
-    patch({
-      todoColors: settings.todoColors.filter((_, i) => i !== idx),
-    })
-  }
 
   return createPortal(
     <div
@@ -242,75 +275,12 @@ export default function SettingsPanel({
               checked={settings.showShortcutHint}
               onChange={(v) => patch({ showShortcutHint: v })}
             />
-          </section>
 
-          <section
-            className="settings-section"
-            aria-labelledby="settings-todo-colors"
-          >
-            <h3
-              id="settings-todo-colors"
-              className="settings-section-title"
-            >
-              Todo colors
-            </h3>
-            <p className="settings-help">
-              Pick colors for each todo (text + check circle). Min 4, max 8.
-            </p>
-
-            <div className="todo-color-editor-list">
-              {settings.todoColors.map((c, idx) => {
-                const canDelete = idx >= MIN_TODO_COLORS
-                return (
-                  <div key={c.id} className="todo-color-editor-row">
-                    <span
-                      className="todo-color-editor-swatch"
-                      aria-hidden
-                      style={{ background: c.hex }}
-                    />
-
-                    <input
-                      className="todo-color-editor-name"
-                      type="text"
-                      value={c.name}
-                      onChange={(e) =>
-                        updateTodoColorAt(idx, { name: e.target.value })
-                      }
-                    />
-
-                    <input
-                      className="todo-color-editor-picker"
-                      type="color"
-                      value={c.hex}
-                      onChange={(e) =>
-                        updateTodoColorAt(idx, { hex: e.target.value })
-                      }
-                      aria-label={`Edit color ${c.name}`}
-                    />
-
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      disabled={!canDelete}
-                      onClick={() => removeTodoColorAt(idx)}
-                      title={canDelete ? 'Remove color' : 'At least 4 colors required'}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-muted"
-              disabled={settings.todoColors.length >= MAX_TODO_COLORS}
-              onClick={addTodoColor}
-              style={{ width: '100%', justifyContent: 'center' }}
-            >
-              Add color
-            </button>
+            <p className="settings-hint settings-hint-spaced">Task label colors</p>
+            <TodoColorEditor
+              colors={settings.todoColors}
+              onChange={(next) => patch({ todoColors: next })}
+            />
           </section>
 
           <section className="settings-section" aria-labelledby="settings-data">

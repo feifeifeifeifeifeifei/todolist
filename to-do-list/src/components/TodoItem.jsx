@@ -11,14 +11,17 @@ export default function TodoItem({
   onToggle,
   onDelete,
   todoColors,
-  onSetTodoColor,
+  onSetColor,
+  isDragging,
+  dropIndicator,
+  onItemDragStart,
+  onItemDragOver,
+  onItemDragEnd,
 }) {
   const [isComposing, setIsComposing] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const liRef = useRef(null)
-
-  const selectedColor =
-    todoColors?.find((c) => c.id === todo.colorId) ?? todoColors?.[0]
+  const fromHandle = useRef(false)
 
   useEffect(() => {
     if (!isEditing) setIsComposing(false)
@@ -47,8 +50,48 @@ export default function TodoItem({
 
   const closeMenu = () => setMenuOpen(false)
 
+  const itemColor = todo.color || null
+
+  const checkStyle = itemColor
+    ? { '--todo-custom-color': itemColor }
+    : undefined
+
+  const liClass = [
+    'todo-item',
+    isDragging && 'is-dragging',
+    dropIndicator === 'before' && 'drop-before',
+    dropIndicator === 'after' && 'drop-after',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <li ref={liRef} className="todo-item">
+    <li
+      ref={liRef}
+      className={liClass}
+      onDragStart={(e) => {
+        if (!fromHandle.current) {
+          e.preventDefault()
+          return
+        }
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', String(todo.id))
+        requestAnimationFrame(() => onItemDragStart(todo.id))
+      }}
+      onDragEnd={() => {
+        fromHandle.current = false
+        liRef.current?.removeAttribute('draggable')
+        onItemDragEnd()
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
+        const rect = e.currentTarget.getBoundingClientRect()
+        const midY = rect.top + rect.height / 2
+        onItemDragOver(todo.id, e.clientY < midY ? 'before' : 'after')
+      }}
+    >
       {isEditing ? (
         <>
           <input
@@ -82,18 +125,21 @@ export default function TodoItem({
         <>
           <button
             type="button"
-            className={`todo-check-btn${todo.completed ? ' is-checked' : ''}`}
+            className={`todo-check-btn${todo.completed ? ' is-checked' : ''}${itemColor ? ' has-custom-color' : ''}`}
+            style={checkStyle}
             aria-pressed={todo.completed}
             aria-label={todo.completed ? 'Mark as not done' : 'Mark as done'}
             onClick={() => onToggle(todo.id)}
-            style={{
-              '--todo-color': selectedColor?.hex ?? undefined,
+            onMouseDown={(e) => {
+              if (e.button !== 0) return
+              fromHandle.current = true
+              liRef.current?.setAttribute('draggable', 'true')
             }}
           />
 
           <span
-            className={`todo-text${todo.completed ? ' completed' : ''}`}
-            style={{ '--todo-color': selectedColor?.hex ?? undefined }}
+            className={todo.completed ? 'completed' : ''}
+            style={itemColor && !todo.completed ? { color: itemColor } : undefined}
           >
             {todo.text}
           </span>
@@ -134,36 +180,35 @@ export default function TodoItem({
                   Delete
                 </button>
 
-                <div className="todo-more-divider" role="separator" />
+                <div className="todo-more-divider" />
 
-                <div className="todo-more-color-block" aria-label="Choose color">
-                  <div className="todo-more-color-title">Color</div>
-                  <div className="todo-more-color-grid">
-                    {(todoColors ?? []).map((c) => {
-                      const isActive = c.id === todo.colorId
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          className={`todo-more-color-btn${
-                            isActive ? ' is-active' : ''
-                          }`}
-                          onClick={() => {
-                            closeMenu()
-                            onSetTodoColor(todo.id, c.id)
-                          }}
-                          aria-pressed={isActive}
-                          aria-label={`Set todo color to ${c.name}`}
-                          title={c.name}
-                          style={{ '--todo-color': c.hex }}
-                        >
-                          <span
-                            className="todo-more-color-dot"
-                            style={{ background: c.hex }}
-                          />
-                        </button>
-                      )
-                    })}
+                <div className="todo-color-section">
+                  <span className="todo-color-label">Color</span>
+                  <div className="todo-color-row">
+                    <button
+                      type="button"
+                      className={`todo-color-circle todo-color-circle--none${!itemColor ? ' is-active' : ''}`}
+                      aria-label="Default color"
+                      title="Default"
+                      onClick={() => {
+                        onSetColor(todo.id, null)
+                        closeMenu()
+                      }}
+                    />
+                    {todoColors.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        className={`todo-color-circle${itemColor === hex ? ' is-active' : ''}`}
+                        style={{ '--dot': hex }}
+                        aria-label={hex}
+                        title={hex}
+                        onClick={() => {
+                          onSetColor(todo.id, hex)
+                          closeMenu()
+                        }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
