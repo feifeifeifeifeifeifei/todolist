@@ -1,6 +1,6 @@
 {
   "name": "todolist-desktop",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "macOS desktop wrapper for the to-do-list web app",
   "author": {
     "name": "feiren"

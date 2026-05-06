@@ -28,6 +28,7 @@ Unistall in `Applications` folder.
 - Settings panel: light / dark / follow system, where new tasks get inserted (top or bottom), whether the input closes after adding, custom color presets, and a one-click "clear all".
 - Keyboard shortcut `n` to start a new task.
 - Data lives in `localStorage`, so your list stays put between launches.
+- Minimal mode, only shows "Add Task" and to do list.
 - The window can float on top. (Window -> Always on top)
 - Window zoom in/out proportionally. (Window -> Window size)
 

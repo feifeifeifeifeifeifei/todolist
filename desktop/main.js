@@ -100,6 +100,86 @@ const INJECTED_CSS = `
     margin: 0 !important;
     z-index: 2 !important;
   }
+  /* ---------- Minimal-mode toggle button ---------- */
+  /* Visually mirror the existing settings gear and sit just to its left. */
+  #electron-minimal-toggle {
+    position: fixed;
+    top: 1.1rem;
+    right: 3.55rem;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    padding: 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text-h);
+    cursor: pointer;
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow) 40%, transparent);
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      transform 0.1s ease,
+      color 0.15s ease;
+    -webkit-app-region: no-drag;
+  }
+  #electron-minimal-toggle:hover {
+    border-color: var(--accent-border);
+    background: var(--social-bg);
+  }
+  #electron-minimal-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  #electron-minimal-toggle:active {
+    transform: scale(0.96);
+  }
+  #electron-minimal-toggle svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #electron-minimal-toggle .icon-expand {
+    display: none;
+  }
+  body.app--minimal #electron-minimal-toggle {
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+  body.app--minimal #electron-minimal-toggle .icon-minimize {
+    display: none;
+  }
+  body.app--minimal #electron-minimal-toggle .icon-expand {
+    display: block;
+  }
+  /* ---------- Minimal-mode layout: hide non-essential sections ---------- */
+  body.app--minimal .app > h1,
+  body.app--minimal .app > .todo-subtitle,
+  body.app--minimal .app > .todo-stats,
+  body.app--minimal .app > .filters,
+  body.app--minimal .app > .clear-completed-and-undo {
+    display: none !important;
+  }
+  /* In normal mode the title/subtitle naturally pushed the Add Task button
+     down past the icon row. Without them we need explicit clearance so the
+     button doesn't sit under the minimal/settings icons. The icons span from
+     top:1.1rem to ~3.45rem; 4rem leaves a comfortable ~0.55rem gap. */
+  body.app--minimal .app {
+    padding-top: 4rem !important;
+  }
+  /* drop the bottom padding we added for the floating Undo button */
+  body.app--minimal .app:has(.clear-completed-and-undo .btn-ghost) {
+    padding-bottom: clamp(1.25rem, 4vw, 1.75rem) !important;
+  }
+  /* and trim the Add Task button's bottom margin since the next thing under
+     it is just the list — no need for the original 1rem breathing room */
+  body.app--minimal .app > .todo-add-section {
+    margin-bottom: 0.6rem !important;
+  }
 `;
 
 function resolveDistDir() {
@@ -337,22 +417,39 @@ function createWindow() {
   win.on('focus', () => syncAlwaysOnTopMenu(win));
 }
 
+function cssHeightToDip(rawCssHeight) {
+  const cssHeight = Math.ceil(rawCssHeight);
+  if (!Number.isFinite(cssHeight) || cssHeight <= 0) return null;
+  const scale = SCALE_PRESETS[currentSize] || 1.0;
+  const cappedCss = Math.min(BASE.MAX_AUTOGROW, cssHeight);
+  return Math.ceil(cappedCss * scale);
+}
+
 ipcMain.on('content-height', (event, rawCssHeight) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || win.isDestroyed()) return;
-  const cssHeight = Math.ceil(rawCssHeight);
-  if (!Number.isFinite(cssHeight) || cssHeight <= 0) return;
-
-  // The renderer measures in CSS pixels. With the zoom factor applied,
-  // 1 CSS px = scale DIPs on screen. Convert + cap.
-  const scale = SCALE_PRESETS[currentSize] || 1.0;
-  const cappedCss = Math.min(BASE.MAX_AUTOGROW, cssHeight);
-  const desiredDip = Math.ceil(cappedCss * scale);
+  const desiredDip = cssHeightToDip(rawCssHeight);
+  if (desiredDip === null) return;
 
   const [w, currentH] = win.getContentSize();
   // only auto-grow; never shrink the window the user has manually sized
   if (desiredDip <= currentH) return;
   win.setContentSize(w, desiredDip, false);
+});
+
+// Used by the minimal-mode toggle: refit the window to current content height
+// in BOTH directions (allow shrinking too), so that flipping minimal on / off
+// produces an obviously-tighter or obviously-larger window.
+ipcMain.on('content-height-fit', (event, rawCssHeight) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return;
+  const desiredDip = cssHeightToDip(rawCssHeight);
+  if (desiredDip === null) return;
+
+  const scale = SCALE_PRESETS[currentSize] || 1.0;
+  const minH = Math.round(BASE.MIN_HEIGHT * scale);
+  const [w] = win.getContentSize();
+  win.setContentSize(w, Math.max(desiredDip, minH), false);
 });
 
 app.whenReady().then(() => {
