@@ -8,6 +8,7 @@ const {
   shell,
 } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const url = require('node:url');
 
 app.setName('TodoList');
@@ -15,11 +16,25 @@ app.setName('TodoList');
 const isDev = process.env.ELECTRON_DEV === '1' && !app.isPackaged;
 const DEV_URL = process.env.VITE_DEV_URL || 'http://localhost:5173';
 
-const WIN_WIDTH = 480;
-const MIN_CONTENT_WIDTH = 320;
-const MIN_CONTENT_HEIGHT = 240;
-const INITIAL_CONTENT_HEIGHT = 360;
-const MAX_AUTOGROW_HEIGHT = 720;
+// All sizes are expressed at scale = 1.0 ("Large"). Other sizes scale them
+// proportionally — both the rendered content (via webContents zoom factor)
+// and the window's physical dimensions (via setContentSize). The CSS layout
+// viewport stays the same at every size, so the design just renders smaller.
+const SCALE_PRESETS = {
+  large: 1.0,
+  medium: 0.85,
+  small: 0.7,
+};
+const SIZE_LABELS = { large: 'Large', medium: 'Medium', small: 'Small' };
+const SIZE_ORDER = ['large', 'medium', 'small'];
+
+const BASE = {
+  WIDTH: 480,
+  MIN_WIDTH: 320,
+  MIN_HEIGHT: 240,
+  INITIAL_HEIGHT: 360,
+  MAX_AUTOGROW: 720,
+};
 
 const INJECTED_CSS = `
   :root {
@@ -71,6 +86,20 @@ const INJECTED_CSS = `
     -webkit-app-region: no-drag !important;
     z-index: 3 !important;
   }
+  /* Pin the "Undo clear" button to the bottom of the card. We only do this
+     when Undo is actually rendered (clearedTodos.length > 0); when it's
+     absent, the layout is unchanged. */
+  .app:has(.clear-completed-and-undo .btn-ghost) {
+    padding-bottom: 3.5rem !important;
+  }
+  .clear-completed-and-undo .btn-ghost {
+    position: absolute !important;
+    bottom: 1rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    margin: 0 !important;
+    z-index: 2 !important;
+  }
 `;
 
 function resolveDistDir() {
@@ -78,6 +107,36 @@ function resolveDistDir() {
     return path.join(process.resourcesPath, 'web');
   }
   return path.resolve(__dirname, '..', 'to-do-list', 'dist');
+}
+
+function settingsPath() {
+  return path.join(app.getPath('userData'), 'desktop-settings.json');
+}
+
+function loadSettings() {
+  try {
+    const raw = fs.readFileSync(settingsPath(), 'utf8');
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSettings(patch) {
+  try {
+    const file = settingsPath();
+    const merged = { ...loadSettings(), ...patch };
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(merged, null, 2));
+  } catch (err) {
+    console.warn('Failed to save desktop settings:', err);
+  }
+}
+
+function getInitialSize() {
+  const stored = loadSettings().size;
+  return stored && stored in SCALE_PRESETS ? stored : 'large';
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -93,9 +152,66 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let alwaysOnTopMenuItem = null;
+const sizeMenuItems = {};
+let currentSize = 'large';
+
+function syncSizeMenu() {
+  for (const name of SIZE_ORDER) {
+    const item = sizeMenuItems[name];
+    if (item) item.checked = name === currentSize;
+  }
+}
+
+function syncAlwaysOnTopMenu(win) {
+  if (!alwaysOnTopMenuItem || !win || win.isDestroyed()) return;
+  alwaysOnTopMenuItem.checked = win.isAlwaysOnTop();
+}
+
+function applySize(win, sizeName) {
+  if (!win || win.isDestroyed()) return;
+  const next = sizeName in SCALE_PRESETS ? sizeName : 'large';
+  const newScale = SCALE_PRESETS[next];
+  const oldScale = SCALE_PRESETS[currentSize] || 1.0;
+
+  win.webContents.setZoomFactor(newScale);
+  win.setMinimumSize(
+    Math.round(BASE.MIN_WIDTH * newScale),
+    Math.round(BASE.MIN_HEIGHT * newScale),
+  );
+
+  if (newScale !== oldScale) {
+    const [w, h] = win.getContentSize();
+    const ratio = newScale / oldScale;
+    const minW = Math.round(BASE.MIN_WIDTH * newScale);
+    const minH = Math.round(BASE.MIN_HEIGHT * newScale);
+    win.setContentSize(
+      Math.max(Math.round(w * ratio), minW),
+      Math.max(Math.round(h * ratio), minH),
+      false,
+    );
+  }
+
+  currentSize = next;
+  saveSettings({ size: next });
+  syncSizeMenu();
+}
 
 function buildAppMenu() {
   const isMac = process.platform === 'darwin';
+
+  const sizeSubmenu = SIZE_ORDER.map((name, idx) => ({
+    id: `size-${name}`,
+    label: SIZE_LABELS[name],
+    type: 'radio',
+    checked: currentSize === name,
+    accelerator: `CmdOrCtrl+${idx + 1}`,
+    click: () => {
+      const win = BrowserWindow.getFocusedWindow()
+        || BrowserWindow.getAllWindows()[0];
+      if (win) applySize(win, name);
+    },
+  }));
+
   const template = [
     ...(isMac
       ? [
@@ -143,6 +259,8 @@ function buildAppMenu() {
         { role: 'minimize' },
         { role: 'zoom' },
         { type: 'separator' },
+        { label: 'Window Size', submenu: sizeSubmenu },
+        { type: 'separator' },
         {
           id: 'always-on-top',
           label: 'Always on Top',
@@ -161,29 +279,25 @@ function buildAppMenu() {
       ],
     },
   ];
+
   const menu = Menu.buildFromTemplate(template);
   alwaysOnTopMenuItem = menu.getMenuItemById('always-on-top');
+  for (const name of SIZE_ORDER) {
+    sizeMenuItems[name] = menu.getMenuItemById(`size-${name}`);
+  }
   return menu;
 }
 
-function syncAlwaysOnTopMenu(win) {
-  if (!alwaysOnTopMenuItem || !win || win.isDestroyed()) return;
-  alwaysOnTopMenuItem.checked = win.isAlwaysOnTop();
-}
-
-function clampAutoGrow(rawHeight) {
-  if (!Number.isFinite(rawHeight)) return null;
-  return Math.min(MAX_AUTOGROW_HEIGHT, Math.ceil(rawHeight));
-}
-
 function createWindow() {
+  const initialScale = SCALE_PRESETS[currentSize];
+
   const win = new BrowserWindow({
-    width: WIN_WIDTH,
-    height: INITIAL_CONTENT_HEIGHT,
+    width: Math.round(BASE.WIDTH * initialScale),
+    height: Math.round(BASE.INITIAL_HEIGHT * initialScale),
     useContentSize: true,
     resizable: true,
-    minWidth: MIN_CONTENT_WIDTH,
-    minHeight: MIN_CONTENT_HEIGHT,
+    minWidth: Math.round(BASE.MIN_WIDTH * initialScale),
+    minHeight: Math.round(BASE.MIN_HEIGHT * initialScale),
     maximizable: true,
     fullscreenable: true,
     title: 'TodoList',
@@ -193,6 +307,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, 'preload.js'),
+      zoomFactor: initialScale,
     },
   });
 
@@ -204,6 +319,9 @@ function createWindow() {
   }
 
   win.webContents.on('did-finish-load', () => {
+    // re-assert zoom factor in case the navigation reset it (Chromium does
+    // remember it per origin, but we want a hard guarantee on every load)
+    win.webContents.setZoomFactor(SCALE_PRESETS[currentSize]);
     win.webContents.insertCSS(INJECTED_CSS);
   });
 
@@ -219,19 +337,27 @@ function createWindow() {
   win.on('focus', () => syncAlwaysOnTopMenu(win));
 }
 
-ipcMain.on('content-height', (event, rawHeight) => {
+ipcMain.on('content-height', (event, rawCssHeight) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win || win.isDestroyed()) return;
-  const desired = clampAutoGrow(rawHeight);
-  if (desired === null || desired <= 0) return;
+  const cssHeight = Math.ceil(rawCssHeight);
+  if (!Number.isFinite(cssHeight) || cssHeight <= 0) return;
+
+  // The renderer measures in CSS pixels. With the zoom factor applied,
+  // 1 CSS px = scale DIPs on screen. Convert + cap.
+  const scale = SCALE_PRESETS[currentSize] || 1.0;
+  const cappedCss = Math.min(BASE.MAX_AUTOGROW, cssHeight);
+  const desiredDip = Math.ceil(cappedCss * scale);
+
   const [w, currentH] = win.getContentSize();
-  // only auto-grow when the content actually overflows the current window;
-  // never auto-shrink, so the user keeps any height they manually picked
-  if (desired <= currentH) return;
-  win.setContentSize(w, desired, false);
+  // only auto-grow; never shrink the window the user has manually sized
+  if (desiredDip <= currentH) return;
+  win.setContentSize(w, desiredDip, false);
 });
 
 app.whenReady().then(() => {
+  currentSize = getInitialSize();
+
   const distDir = resolveDistDir();
 
   protocol.handle('app', (request) => {
