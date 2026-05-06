@@ -1,0 +1,97 @@
+{
+  "name": "todolist-desktop",
+  "version": "0.2.0",
+  "description": "macOS desktop wrapper for the to-do-list web app",
+  "author": {
+    "name": "feiren"
+  },
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron -c blue,magenta \"npm:dev:web\" \"npm:dev:electron\"",
+    "dev:web": "npm --prefix ../to-do-list run dev -- --port 5173 --strictPort",
+    "dev:electron": "wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron .",
+    "start": "npm run build:web && electron .",
+    "build:icon": "electron scripts/build-icon.js",
+    "build:web": "npm --prefix ../to-do-list run build",
+    "build": "npm run build:icon && npm run build:web && electron-builder --mac",
+    "build:dmg": "npm run build:icon && npm run build:web && electron-builder --mac dmg",
+    "package": "npm run build"
+  },
+  "build": {
+    "appId": "com.feiren.todolist",
+    "productName": "TodoList",
+    "copyright": "Copyright © 2026 feiren",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "!build/**",
+      "!release/**",
+      "!scripts/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../to-do-list/dist",
+        "to": "web"
+      }
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "${productName} ${version} ${arch}",
+      "icon": "build/icon.png",
+      "iconSize": 110,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 180,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  }
+}
