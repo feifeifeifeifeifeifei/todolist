@@ -1,9 +1,5 @@
 # TodoList Desktop (macOS)
 
-Electron 壳子，把同目录下的 `to-do-list/`（React + Vite 网页应用）封装成 macOS 桌面应用。
-
-> 不修改 `to-do-list/` 里的任何文件，所有桌面化逻辑都在本目录下。
-
 ## 目录结构
 
 ```
@@ -107,10 +103,3 @@ npm run build:dmg
 
 - 想分发给别人：需要苹果开发者账号（$99/年）配置 `mac.identity` 用 Developer ID 签名 + 公证（notarize），electron-builder 文档里有完整步骤。
 
-## 后续可以改的方向
-
-- 系统菜单 / 快捷键：在 `main.js` 用 `Menu.setApplicationMenu(...)` 自定义。
-- 数据持久化：当前还是网页里那套 `localStorage`；要写到本地文件可以经 `preload.js` 用 `contextBridge` 暴露 `ipcRenderer`，主进程那边读写文件。
-- 关闭时驻留 Dock / 状态栏：用 `Tray` API。
-- 全局快捷键：`globalShortcut.register(...)`。
-- 自动更新：electron-builder 自带 `electron-updater`，可以挂到自己服务器或 GitHub Releases。
