@@ -5,6 +5,8 @@ A small todo app I wrote for myself, in two flavors:
 - `to-do-list/` — the web version (React + Vite).
 - `desktop/` — the macOS version, built on top of the web app with Electron.
 
+![window](window.png)
+
 ## Install (macOS)
 
 Grab a `.dmg` from `desktop/release/` and open it:
