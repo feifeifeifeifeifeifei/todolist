@@ -31,6 +31,9 @@ Unistall in `Applications` folder.
 - The window can float on top. (Window -> Always on top)
 - Window zoom in/out proportionally. (Window -> Window size)
 
+![settings1](settings-1.png)
+![settings2](settings-2.png)
+
 ## Web version
 
 If you'd rather run it in a browser:
